@@ -5,25 +5,43 @@ class Segment {
         this.dir = dir;
     }
 
+    // Returns legth of the segment
     Length() {
         var dx = this.p0.x - this.p1.x;
         var dy = this.p0.y - this.p1.y;
         return Math.hypot(dx, dy);
     }
+
+    // Returns true if two segments are intersected
+    // This method uses parametric equation of the edge P(t) = P0+(P1-P0)*t
+    Intersect(seg) {
+        var x1 = this.p0.x;
+        var y1 = this.p0.y;
+        var x2 = this.p1.x;
+        var y2 = this.p1.y;
+        var x3 = seg.p0.x;
+        var y3 = seg.p0.y;
+        var x4 = seg.p1.x;
+        var y4 = seg.p1.y;
+        var den = (y4 - y3) * (x2 - x1) - (y2 - y1) * (x4 - x3);
+        var t1 = ((y4 - y3) * (x3 - x1) - (y3 - y1) * (x4 - x3)) / den;
+        var t2 = ((y2 - y1) * (x3 - x1) - (y3 - y1) * (x2 - x1)) / den;
+        return (t1 >= 0) && (t1 <= 1) && (t2 >= 0) && (t2 <= 1);
+    }
 }
 
 class Apple {
-  constructor(x, y) {
-    this.x = x,
-    this.y = y
-  }
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
 }
 
 class Snake {
     constructor() {
         this.speed = 5;
         this.width = 10;
-        this.color = '#0000FF';
+        this.color = '#0000FF';        
         this.segments = [
             new Segment(
                 { x: 100, y: 100 },
@@ -41,10 +59,11 @@ class Snake {
     }
 
     Extend() {
-      var seg0 = this.GetFirstSegment();
-      seg0.p0.x += seg0.dir.x * 10;
-      seg0.p0.y += seg0.dir.y * 10;
+        var seg0 = this.GetFirstSegment();
+        seg0.p0.x += seg0.dir.x * 5;
+        seg0.p0.y += seg0.dir.y * 5;
     }
+
     // Makes one step of the snake
     Step() {
         var seg0 = this.GetFirstSegment();
@@ -73,6 +92,18 @@ class Snake {
             && y <= box.height;
     }
 
+    // Returns true if the first segment intersects snake
+    Intersect() {
+        var seg0 = this.GetFirstSegment();
+        for (var i = 2; i < this.segments.length; i++) {
+            if (seg0.Intersect(this.segments[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Turn a head the the snake
     Turn(dir) {
         var seg = this.GetFirstSegment();
         var dotProduct = seg.dir.x * dir.x + seg.dir.y * dir.y;
@@ -111,45 +142,47 @@ class Game {
         }
         this.graphics.strokeStyle = this.appleColor;
         for (var i = 0; i < this.apples.length; i++) {
-          var x = this.apples[i].x;
-          var y = this.apples[i].y;
-          this.graphics.beginPath();
-          this.graphics.arc(x, y, 2, 0, 2 * Math.PI);
-          this.graphics.stroke();
+            var x = this.apples[i].x;
+            var y = this.apples[i].y;
+            this.graphics.beginPath();
+            this.graphics.arc(x, y, 2, 0, 2 * Math.PI);
+            this.graphics.stroke();
         }
         this.graphics.closePath();
-    }
+    } 
 
+    // Add apples to the game engine
     AddApples() {
-      if(this.apples.length >= 1) {
-        return;
-      }
-      var min = 5;
-      var max = this.box.width - 10;
-      var x = Math.floor(Math.random() * (max - min + 1)) + min;
-      var y = Math.floor(Math.random() * (max - min + 1)) + min;
-      var apple = new Apple(x, y);
-      this.apples.push(apple);
+        if (this.apples.length >= 1) {
+            return;
+        }
+        var min = 10;
+        var max = this.box.width - 10;
+        var x = Math.floor(Math.random() * (max - min + 1)) + min;
+        var y = Math.floor(Math.random() * (max - min + 1)) + min;
+        var apple = new Apple(x, y);
+        this.apples.push(apple);
     }
 
+    // Removes apple if it meets the snake
     EatApple() {
-      var x0 = this.snake.segments[0].p0.x;
-      var y0 = this.snake.segments[0].p0.y;
-      for (var i = 0; i < this.apples.length; i++) {
-        var apple = this.apples[i];
-        var distance = Math.hypot(apple.x - x0, apple.y - y0);
-        if(distance < 10 ) {
-          this.apples.splice(i, 1);
-          this.snake.Extend();
-          this.score++;
-          $('#score').text(this.score);
+        var x0 = this.snake.segments[0].p0.x;
+        var y0 = this.snake.segments[0].p0.y;
+        for (var i = 0; i < this.apples.length; i++) {
+            var apple = this.apples[i];
+            var distance = Math.hypot(apple.x - x0, apple.y - y0);
+            if (distance < 10) {
+                this.apples.splice(i, 1);
+                this.snake.Extend();
+                this.score++;
+                $('#score').text(this.score);
+            }
         }
-      }
     }
 
     Process() {
         this.snake.Step();
-        if (!this.snake.InsideBox(this.box)) {
+        if (!this.snake.InsideBox(this.box) || this.snake.Intersect()) {
             this.Stop();
             return;
         }
@@ -158,16 +191,20 @@ class Game {
         this.Draw();
     }
 
+    // Start the game
     Start() {
         this.timer = setInterval(this.Process.bind(this), 100);
     }
 
+    // Stop the game and show "Gane over!"
     Stop() {
         clearInterval(this.timer);
         this.graphics.font = '30px Arial';
         this.graphics.textAlign = 'center';
         this.graphics.fillStyle = 'red';
         this.graphics.fillText('Game over!', this.box.width / 2, this.box.height / 2);
+        var sound = document.getElementById('player');
+        sound.play();
     }
 
     OnKeyDown(event) {
